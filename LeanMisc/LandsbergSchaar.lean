@@ -12,25 +12,22 @@ noncomputable
 def f (p q : ℕ) (x : ℕ) : ℂ :=
   exp ((x ^ 2) / (4 * p * q))
 
-/-lemma f_periodic (t : ℕ) (p q : ℕ) :
+lemma f_periodic (t : ℕ) (p q : ℕ) :
   f p q (t + 2 * p * q) = f p q (t) :=
     by
     unfold f; unfold exp;
-    field_simp; rw [add_sq, left_distrib, left_distrib]; -/
+    field_simp; rw [add_sq, left_distrib, left_distrib];
+    sorry
 
 lemma exp_periodic : Function.Periodic (fun x => exp x) (2*Real.pi) := by
-  unfold exp; intro s; simp; rw [mul_add];
-  sorry
+  unfold exp; intro s; simp; sorry
 
 lemma ar {p q : ℕ} : (2 * ↑p * ↑q)^2 = p * q * (4 * p * q) :=   by ring
 
-lemma f_periodic {p q : ℕ} : Function.Periodic (fun (x:ℕ) => f p q x) (2*p*q) := by
+lemma f_periodic_ {p q : ℕ} : Function.Periodic (fun (x:ℕ) => f p q x) (2*p*q) := by
   rcases eq_or_ne (2*p*q) 0 with (hL | hT)
   . intro s; simp only [hL]; simp
   . intro s; unfold f; unfold exp; simp; rw [add_sq]; sorry
-
-
-
 
 lemma exp_add (a b : ℝ) :
   exp (a) * exp (b) = exp (a + b) := by
@@ -134,15 +131,20 @@ lemma _exp_sub(x k p q : ℕ) :
   rw [exp_sub]
   field_simp
 
-theorem step_three (p q : ℕ) (k : ℕ) (hpq : p * q ≠ 0) :
+theorem step_three (p q : ℕ) (k : ℕ):
   1/(2 * p * q) * (∑ x ∈ Finset.range (2 * p * q), exp ((((x - k :ℝ)^2) - (k ^2) ) / (4 * p * q))) = 1 / (2 * p * q) * exp (- k^2 / (4 * p * q)) * (∑ x ∈ Finset.range (2 * p * q), exp ((x-k)^2 / (4 * p * q))) := by
     field_simp
     congr
     simp [_exp_sub, sum_mul_left]
 
+lemma translation_invariance (N : ℕ) (k : ℕ):
+  ∑ x ∈ Finset.range (N), exp ((x-k)^2 / (2 * N)) = ∑ x ∈ Finset.range (N), exp ((- x^2) / (2*N)) := by
+  sorry
 
 
 theorem step_four (p q : ℕ) (k : ℕ) (hpq : p * q ≠ 0) :
   1/(2 * p * q) * (∑ x ∈ Finset.range (2 * p * q), (exp ((x - k)^2 / (4 * p * q)) * exp ((- k ^2 ) / (4 * p * q)))) = 1 / (2 * p * q) * exp (- k^2 / (4 * p * q)) * (∑ x ∈ Finset.range (2 * p * q), exp (- x^2 / (4 * p * q))) := by
     rw [← sum_mul_right]
+    field_simp
     sorry
+    --simp only [translation_invariance (2 * p * q)]

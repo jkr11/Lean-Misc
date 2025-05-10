@@ -22,10 +22,15 @@ lemma exp_periodic : Function.Periodic (fun x => exp x) (2*Real.pi) := by
   unfold exp; intro s; simp; rw [mul_add];
   sorry
 
+lemma ar {p q : ℕ} : (2 * ↑p * ↑q)^2 = p * q * (4 * p * q) :=   by ring
+
 lemma f_periodic {p q : ℕ} : Function.Periodic (fun (x:ℕ) => f p q x) (2*p*q) := by
   rcases eq_or_ne (2*p*q) 0 with (hL | hT)
   . intro s; simp only [hL]; simp
-  . intro s; unfold f; unfold exp; simp; rw [add_sq]; simp only [pow_two]; sorry
+  . intro s; unfold f; unfold exp; simp; rw [add_sq]; sorry
+
+
+
 
 lemma exp_add (a b : ℝ) :
   exp (a) * exp (b) = exp (a + b) := by
@@ -86,6 +91,7 @@ noncomputable
 def f_hat' (p q : ℕ) (f : ℕ → ℂ) (x : ℕ) : ℂ :=
   fourier_coefficients (2 * p * q) f x
 
+
 lemma canc (a b c : ℂ) (ha : a ≠ 0) (hc : c ≠ 0) :
   (a * b) / (a * c) = b / c := by
   rw [mul_div_assoc]
@@ -122,9 +128,18 @@ theorem step_two (p q : ℕ) (k : ℕ) (hpq : (2:ℂ)*p*q ≠ 0):
     simp only [mul_assoc]
     simp [mul_comm]
 
+lemma _exp_sub(x k p q : ℕ) :
+  exp ((((x - k)^2) - (k ^2)) / (4 * p * q)) = exp ((-k^2) / (4 * p * q)) * exp ((x-k)^2 / (4 * p * q)) := by
+  rw [sub_div ((x-k :ℝ )^2) (k^2) (4 * p * q) ]
+  rw [exp_sub]
+  field_simp
+
 theorem step_three (p q : ℕ) (k : ℕ) (hpq : p * q ≠ 0) :
-  1/(2 * p * q) * (∑ x ∈ Finset.range (2 * p * q), exp (((x - k)^2 - k ^2 ) / (4 * p * q))) = 1 / (2 * p * q) * exp (- k^2 / (4 * p * q)) * (∑ x ∈ Finset.range (2 * p * q), exp (- x^2 / (4 * p * q))) := by
-    sorry
+  1/(2 * p * q) * (∑ x ∈ Finset.range (2 * p * q), exp ((((x - k :ℝ)^2) - (k ^2) ) / (4 * p * q))) = 1 / (2 * p * q) * exp (- k^2 / (4 * p * q)) * (∑ x ∈ Finset.range (2 * p * q), exp ((x-k)^2 / (4 * p * q))) := by
+    field_simp
+    congr
+    simp [_exp_sub, sum_mul_left]
+
 
 
 theorem step_four (p q : ℕ) (k : ℕ) (hpq : p * q ≠ 0) :

@@ -19,8 +19,15 @@ lemma f_periodic (t : ℕ) (p q : ℕ) :
     field_simp; rw [add_sq, left_distrib, left_distrib];
     sorry
 
-lemma exp_periodic : Function.Periodic (fun x => exp x) (2*Real.pi) := by
-  unfold exp; intro s; simp; sorry
+lemma exp_periodic (p q : ℕ): Function.Periodic (fun x => exp x) (2*p*q) := by
+  unfold exp; intro s; simp; rw [mul_add, add_comm]; rw [Complex.exp_add]
+  have : Complex.exp (2 * Real.pi * Complex.I * (2 * p * q :ℤ)) = 1 := by
+    rw [mul_comm]; rw [Complex.exp_int_mul_two_pi_mul_I (2 * p * q)]
+  sorry -- why can we not apply this? weird casting to ℤ
+
+lemma expper (p q : ℕ) : Function.Periodic (fun (x : ℕ) => exp x) (2 * p * q : ℕ) :=
+  by
+  unfold exp; intro s; simp; rw[mul_comm]; sorry --rw [Complex.exp_int_mul_two_pi_mul_I]
 
 lemma ar {p q : ℕ} : (2 * ↑p * ↑q)^2 = p * q * (4 * p * q) :=   by ring
 
@@ -137,14 +144,33 @@ theorem step_three (p q : ℕ) (k : ℕ):
     congr
     simp [_exp_sub, sum_mul_left]
 
-lemma translation_invariance (N : ℕ) (k : ℕ):
-  ∑ x ∈ Finset.range (N), exp ((x-k)^2 / (2 * N)) = ∑ x ∈ Finset.range (N), exp ((- x^2) / (2*N)) := by
-  sorry
+lemma translation_invariance (N : ℕ) (M : ℕ) (k : ℕ) (hn : N > 0):
+  ∑ x ∈ Finset.range (N), exp ((x-k)^2 / (M)) = ∑ x ∈ Finset.range (N), exp ((- x^2) / (2*N)) := by
+  let shift : ℕ → ℕ := fun x => (x + k) % N
+  have : ∀ x < N, shift x < N := by
+    intro x hx
+    unfold shift
+    simp [Nat.mod_lt (x + k) (hn)]
+  rw [Finset.sum_bij (fun x _ => (x + k) % N)]
+  . intros x hx; simp [Nat.mod_lt (x + k) hn]
+  . intros x₁ hx₁ x₂ hx₂ h;
+    have h₁ := Nat.mod_eq_of_lt (Finset.mem_range.mp ‹x₁ ∈ _›)
+    have h₂ := Nat.mod_eq_of_lt (Finset.mem_range.mp ‹x₂ ∈ _›)
+    have h_eq : x₁ = x₂ := by
+      have h_eq : x₁ = x₂ := by
+        have h_mod : (x₁ + k - k) % N = (x₂ + k - k) % N := by
+          simp [Nat.add_sub_cancel];
+          sorry
+        sorry
+      sorry
+    sorry
+  . sorry
+  . sorry
 
 
-theorem step_four (p q : ℕ) (k : ℕ) (hpq : p * q ≠ 0) :
+
+theorem step_four (p q : ℕ) (k : ℕ) (hpq : 2 * p * q  > 0) :
   1/(2 * p * q) * (∑ x ∈ Finset.range (2 * p * q), (exp ((x - k)^2 / (4 * p * q)) * exp ((- k ^2 ) / (4 * p * q)))) = 1 / (2 * p * q) * exp (- k^2 / (4 * p * q)) * (∑ x ∈ Finset.range (2 * p * q), exp (- x^2 / (4 * p * q))) := by
     rw [← sum_mul_right]
     field_simp
     sorry
-    --simp only [translation_invariance (2 * p * q)]

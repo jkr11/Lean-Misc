@@ -23,12 +23,6 @@ lemma exp_periodic (p q : ℕ): Function.Periodic (fun x => exp x) (2*p*q) := by
   rw [h, Complex.exp_int_mul_two_pi_mul_I (2 * p * q)]
   ring
 
-lemma step (t : ℂ) (p q : ℂ) (hpq : p * q ≠ 0) :
-  (t^2 :ℂ) / (4 * p * q) + (t * p*q)/(p*q) + p^2 * q^2 / ( p * q) = (t^2 :ℂ) / (4*p*q) + t + p*q := by
-    congr
-    . field_simp [hpq]; ring
-    . field_simp [hpq]; ring
-
 lemma exp_add (a b : ℝ) :
   exp (a) * exp (b) = exp (a + b) := by
   unfold exp;
@@ -36,7 +30,7 @@ lemma exp_add (a b : ℝ) :
   congr;
   rw [Complex.ofReal_add]
 
-lemma f_periodic (t : ℕ) (p q : ℕ) (hp : p ≠ 0) (hq : q ≠ 0) : f p q (t + 2 * p * q) = f p q (t) := by
+lemma f_periodic_ (t : ℕ) (p q : ℕ) (hp : p ≠ 0) (hq : q ≠ 0) : f p q (t + 2 * p * q) = f p q (t) := by
   unfold f;
   have hpq : p * q ≠ 0 := by exact mul_ne_zero hp hq
   field_simp
@@ -56,6 +50,10 @@ lemma f_periodic (t : ℕ) (p q : ℕ) (hp : p ≠ 0) (hq : q ≠ 0) : f p q (t 
       nth_rewrite 2 [exp]; nth_rewrite 4 [mul_comm];
       let n : ℤ := (t + p * q : ℕ)
       rw [show ((↑(↑t + ↑p * ↑q) : ℝ) :ℂ) = ↑n by push_cast; norm_cast]; simp
+
+lemma f_periodic (p q : ℕ) (hp : p ≠ 0) (hq : q ≠ 0) : Function.Periodic (fun t => f p q t) (2 * p * q) := by
+  intro x; simp; exact f_periodic_ _ _ _ hp hq
+
 
 lemma exp_sub (a b : ℝ) :
   exp (a - b) = exp (-b) * exp (a) := by

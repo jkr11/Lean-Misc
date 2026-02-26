@@ -2,6 +2,7 @@ import Mathlib.Order.Lattice
 import Mathlib.Data.Real.Basic
 import Mathlib.Analysis.Convex.Basic
 import Mathlib.Tactic
+import Mathlib.Algebra.Order.Module.Pointwise
 
 
 /-- A function f : α → ℝ is submodular if f(a ⊔ b) + f(a ⊓ b) ≤ f(a) + f(b). -/
@@ -52,3 +53,90 @@ lemma isSubmodular_additive (w : E → ℝ) :
 lemma IsSubmodular.restriction (A : α) (hf : IsSubmodular f) :
     IsSubmodular (λ (S : Set.Iic A) => f S.val) := by
     intro S T; simp; exact hf S T
+
+
+def IsMonotone (f : Set E → ℝ) : Prop := ∀ ⦃A B⦄, A ⊆ B → f A ≤ f B
+
+structure Polymatroid (E : Type*) where
+  f : Set E → ℝ
+  submod : IsSubmodular f
+  monotone : IsMonotone f
+  normalized : f ∅ = 0
+
+/-- The marginal gain of adding element `i` to set `A`. -/
+def marginalGain (f : Finset E → ℝ) (i : E) (A : Finset E) : ℝ :=
+  f (insert i A) - f A
+
+open Pointwise
+
+lemma insert_i_A_inter_B_eq_B_if_i_nin_B  (A B : Finset E) (hAB : A ⊆ B) (hi : i ∉ B) :
+  insert i A ∩ B = B := by
+    ext x
+
+lemma diminishing_imp_submodular (f : Finset E → ℝ)
+    (h_dim : ∀ A B : Finset E, A ⊆ B → ∀ i : E, i ∉ B →
+      f (insert i A) - f A ≥ f (insert i B) - f B) :
+    IsSubmodular f := by
+  intro A B
+  rw [Finset.sup_eq_union, Finset.inf_eq_inter]
+  suffices f (B ∪ A) - f B ≤ f A - f (B ∩ A) by
+    rw [Finset.union_comm] at this; simp; sorry
+
+  let D := A \ B
+  have hD : D = A \ B := by rfl
+  have h_union : B ∪ A = B ∪ D := by
+    rw [← Finset.union_sdiff_self_eq_union, hD]
+  have h_inter : B ∩ A = A \ D := by
+    ext x; simp [D]; tauto
+
+  rw [h_union, h_inter]
+  clear h_union h_inter
+
+  induction D using Finset.induction_on with
+  | empty =>
+      simp
+  | insert hi hs =>
+      
+      -- Rewrite current goal using the inductive step
+      -- f(B ∪ (s ∪ {i})) - f(B) ≤ f((A\s\i) ∪ (s ∪ {i})) - f(A\s\i)
+      -- This part usually requires telescope summation or
+      -- applying h_dim to the "top" element i.
+      rename_i _ _ i s 
+      have h1 : f (insert i (B ∪ s)) - f (B ∪ s) ≤ f (insert i (B ∩ A ∪ s)) - f (B ∩ A ∪ s) := by
+        apply h_dim
+        · -- B ∩ A ∪ s ⊆ B ∪ s
+          intro x; simp; tauto
+        · -- i ∉ B ∪ s
+          simp at hi; simp [hi]; intro hb;
+          -- i is from A \ B, so i cannot be in B
+          have : i ∈ A \ B := by sorry -- follows from D definition
+          simp at this; tauto
+      simp
+      
+
+
+lemma isSubmodular_iff_diminishing (f : Finset E → ℝ):
+  IsSubmodular f ↔ ∀ A B : Finset E, A ⊆ B → ∀ i : E, i ∉ B → marginalGain f i A ≥ marginalGain f i B := by
+  constructor
+  .
+    intro h A B hAB i hiB
+    specialize h (insert i A) B
+    have h_inf : (insert i A) ⊓ B = A := by
+      rw [Finset.inf_eq_inter]
+      ext x
+      simp only [Finset.mem_inter, Finset.mem_insert]
+      constructor
+      . rintro ⟨(rfl|hxA),hxB⟩
+        . contradiction
+        . exact hxA
+      . intro hxA
+        exact ⟨Or.inr hxA, hAB hxA⟩
+    have h_sup : (insert i A) ⊔ B = insert i B := by
+      rw [Finset.sup_eq_union]
+      ext x
+      simp only [Finset.mem_union, Finset.mem_insert]
+      tauto
+    unfold marginalGain
+    rw [h_inf, h_sup] at h
+    linarith
+  . intro h_dim A B

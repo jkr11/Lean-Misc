@@ -620,6 +620,9 @@ lemma expect_i_linear (i : Fin n) : IsLinearMap ℝ (expect_i i) := by
 noncomputable abbrev Di (i : Fin n) (f : BooleanFunc n) := ddo i f
 noncomputable abbrev Ei (i : Fin n) (f : BooleanFunc n) := expect_i i f
 
+lemma update_bit_same {b : ZMod 2} {x : Cube n} {i : Fin n} (h : x i = b) :
+  update_bit x i b = x := by
+  ext j; by_cases hj : j = i <;> simp [update_bit, hj, h]
 
 theorem decomposition (i : Fin n) (f : BooleanFunc n) (x : Cube n) :
     f x = (χ (x i)) * (Di i f x) + (Ei i f x) := by
@@ -630,16 +633,10 @@ theorem decomposition (i : Fin n) (f : BooleanFunc n) (x : Cube n) :
   let val := x i
   match h: x i with
   | 0 =>
-      simp [χ]
-      have hx : update_bit x i 0 = x := by
-        ext j; by_cases hj : j = i <;> simp [update_bit, hj, h]
-      rw [hx]
+      simp [χ, update_bit_same h]
       ring
   | 1 =>
-      simp [χ]
-      have hx : update_bit x i 1 = x := by
-        ext j; by_cases hj : j = i <;> simp [update_bit, hj, h]
-      rw [hx]
+      simp [χ, update_bit_same h]
       ring
 
 -- def 2.25
@@ -653,3 +650,66 @@ def flip_bit (i : Fin n) (x : Cube n) : Cube n :=
 noncomputable
 def Li' (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
   fun x => (f x - f (flip_bit i x)) / 2
+
+lemma Li_eq_chi_mul_Di (i : Fin n) (f : Cube n → ℝ) (x : Cube n) :
+    Li i f x = χ (x i) * Di i f x := by
+  unfold Li Di
+  match h : x i with
+  | 0 =>
+    simp [h, χ]
+    unfold ddo Ei expect_i
+    simp [update_bit_same h]
+    ring
+  | 1 =>
+    simp [h, χ]
+    unfold ddo Ei expect_i
+    simp [update_bit_same h]
+    ring
+
+lemma update_bit_idempotent (b : ZMod 2) (i : Fin n) (x : Cube n) :
+  update_bit (update_bit x i b) i b = update_bit x i b := by
+  unfold update_bit
+  ext j
+  simp
+  intro h
+  simp [h]
+
+theorem Li_idempotent (i : Fin n) (f : BooleanFunc n) :
+    Li i (Li i f) = Li i f := by
+  ext x
+  unfold Li
+  simp
+  unfold Ei expect_i
+  match h : x i with
+  | 0 =>
+    simp [update_bit_same h]
+    ring
+    simp [update_bit_idempotent]
+    ring
+    unfold update_bit
+    conv_lhs =>
+      enter [2]
+      enter [1]
+      enter [1]
+      ext j
+      simp
+    sorry
+  | 1 => sorry
+  /- flip_bit
+  match h : x i with
+  | 0 =>
+    simp [h, update_bit_same h]
+    unfold update_bit
+    simp
+    ring
+    sorry
+  | 1 =>
+    sorry -/
+
+noncomputable
+def dgo (f : BooleanFunc n) : Cube n → (Fin n → ℝ) :=
+  fun x => fun j => ddo j f x
+
+noncomputable
+def L (f : BooleanFunc n) : BooleanFunc n :=
+  fun x => ∑ i, Li i f x

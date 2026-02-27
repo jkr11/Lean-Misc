@@ -14,6 +14,13 @@ open RealInnerProductSpace
 
 variable {n : ℕ}
 
+/-!
+# Chapter 1: Fourier Analysis of Boolean Functions (O'Donnell)
+
+This file is arranged to mirror the order of definitions and results
+in Ryan O'Donnell's *Analysis of Boolean Functions*.
+-/
+
 abbrev Cube (n : ℕ) : Type := (Fin n -> ZMod 2)
 
 def HammingCube (n : ℕ) := {x : Fin n → ℝ // ∀ i, x i = 1 ∨ x i = -1}
@@ -25,7 +32,6 @@ instance : Pow (BooleanFunc n) ℕ := Pi.instPow
 variable {f : BooleanFunc n}
 
 
--- TODO: rename
 /-- The encoding χ(b) = (-1)^b -/
 def χ (b : ZMod 2) : ℝ := if b = 0 then 1 else -1
 
@@ -39,6 +45,16 @@ lemma chi_repr (b : ZMod 2) :
   . simp
   . simp
 
+lemma chi_add_one (b : ZMod 2) :
+  χ (b + 1) = - χ (b) := by
+  match h : b with
+  | 0 => simp [chi_repr]; unfold chi_base_alt; simp [ZMod.val]
+  | 1 =>
+    have h_true : (1 : ZMod 2) + 1 = 0 := by rfl
+    rw [h_true]
+    unfold χ
+    simp
+
 lemma χ_sq (b : ZMod 2) : (χ b) * (χ b) = 1 := by
   fin_cases b <;> simp [χ]
 
@@ -46,8 +62,8 @@ lemma χ_sq (b : ZMod 2) : (χ b) * (χ b) = 1 := by
 def chi (S : Finset (Fin n) ) : BooleanFunc n :=
   fun x => ∏ i ∈ S, χ (x i)
 
-def χₛ (S : Finset (Fin n)) : BooleanFunc n :=
-  fun x => ∏ i ∈ S, χ (x i)
+abbrev χₛ (S : Finset (Fin n)) : BooleanFunc n :=
+  chi S
 
 noncomputable def chi_alt (S : Finset (Fin n)) : BooleanFunc n :=
   fun x => (-1)^(∑ i ∈ S, (x i).val)
@@ -76,7 +92,7 @@ lemma chi_add (S : Finset (Fin n)) (x y : Fin n → ZMod 2) :
 lemma chi_add' (S : Finset (Fin n)) (x y : Cube n) :
   χₛ S (x + y) = χₛ S x * χₛ S y := by
   unfold χₛ
-  rw [← chi, ← chi, ← chi]
+  repeat rw [← chi]
   simp [chi_add]
 
 
@@ -97,11 +113,9 @@ lemma inpr_eq_expectation (f g : BooleanFunc n) :
 
 lemma char_split (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) :
   χₛ S x = χ (x i) * χₛ (S.erase i) x := by
-  unfold χₛ
+  unfold χₛ chi
   rw [mul_comm, ← Finset.prod_erase_mul]
   exact hi
-
-notation "⟨" f "," g "⟩" => inner_product f g
 
 noncomputable instance : InnerProductSpace.Core ℝ (BooleanFunc n) where
   inner := fun f g => inner_product f g
@@ -116,9 +130,24 @@ noncomputable instance : InnerProductSpace.Core ℝ (BooleanFunc n) where
     apply mul_nonneg
     . apply sum_nonneg; intros y _; apply mul_self_nonneg
     . simp
-  add_left := by sorry
-  smul_left := by sorry
-  definite := by sorry
+  add_left := by
+    unfold inner_product
+    field_simp
+    simp_rw [add_mul, Finset.sum_add_distrib]
+    simp
+  smul_left := by
+    unfold inner_product
+    simp_rw [starRingEnd_apply, star_trivial]
+    field_simp
+    simp_rw [Finset.mul_sum]
+    ring
+    simp
+  definite := by
+    unfold inner_product
+    field_simp
+    simp_rw [← sq]
+    intro x
+    sorry -- because of nonneg but cant find theorem rn
 
 noncomputable instance : NormedAddCommGroup (BooleanFunc n) :=
   instCoreRealBooleanFunc.toNormedAddCommGroup
@@ -131,8 +160,10 @@ noncomputable instance : SeminormedAddCommGroup (BooleanFunc n) :=
 noncomputable instance : InnerProductSpace ℝ (BooleanFunc n) :=
   InnerProductSpace.ofCore instCoreRealBooleanFunc
 
+noncomputable
+instance : Norm (BooleanFunc n) := InnerProductSpace.Core.toNorm (𝕜 := ℝ) (F := BooleanFunc n)
+
 notation "𝐄" => expectation
--- notation "𝔼" f => expectation f
 
 lemma expectation_add (f g : BooleanFunc n) :
   𝐄 (f + g) = 𝐄 f + 𝐄 g := by
@@ -186,25 +217,10 @@ theorem chi_mul_chi (S T : Finset (Fin n)) (x : Fin n → ZMod 2) :
   repeat rw [prod_union (disjoint_sdiff_inter _ _)]
   rw [mul_assoc]
   nth_rewrite 2 [← mul_assoc, mul_comm, ← mul_assoc, mul_comm]
-  rw [← mul_assoc, symmDiff_def S T, inter_comm, ←Finset.prod_mul_distrib]
-  rw [Finset.prod_congr rfl (fun i _ => χ_sq (x i))]
+  rw [← mul_assoc, symmDiff_def S T, inter_comm, ←Finset.prod_mul_distrib, Finset.prod_congr rfl (fun i _ => χ_sq (x i))]
   simp
   rw [prod_union]
   apply disjoint_sdiff_sdiff
-
-
-lemma chi_add_one (i : Fin n) (x : Cube n) :
-  χ (x i + 1) = - χ (x i) := by
-  simp [chi_repr]
-  unfold chi_base_alt
-  sorry -- I dont know why these keep crashing the system. We can use fin_cases b and match h : x i elsewhere too.
-
-lemma chi_add_one' (i : Fin n) (x : Cube n) :
-  χ (x i + 1) = - χ (x i) := by
-  unfold χ
-  sorry
-
-
 
 lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
     expectation (χₛ S) = 0 := by
@@ -216,18 +232,14 @@ lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
 
   have h_neg : ∀ x, χₛ S (f x) = - χₛ S x := by
     intro x
-    unfold χₛ
-    unfold f
-    simp [f, Pi.single_apply]
-    simp [← Finset.prod_erase_mul S _ hj]
-    rw [add_comm, chi_add_one]
-    rw [mul_neg]
+    unfold χₛ f
+    simp [f, Pi.single_apply, ← Finset.prod_erase_mul S _ hj, chi]
+    rw [add_comm, chi_add_one, mul_neg]
     have h_prod_eq : (∏ i in S.erase j, χ ((if i = j then 1 else 0) + x i)) = ∏ i in S.erase j, χ (x i) := by
       apply Finset.prod_congr rfl
       intro i hi
       have hij : i ≠ j := Finset.ne_of_mem_erase hi
-      rw [if_neg hij]
-      rw [zero_add]
+      rw [if_neg hij, zero_add]
     rw [h_prod_eq]
   have h_sum := f.sum_comp (λ x => χₛ S x)
   simp [h_neg] at h_sum
@@ -257,8 +269,14 @@ theorem fourier_expansion (f : BooleanFunc n) :
   sorry
 
 noncomputable
-def fourier_transform (f : BooleanFunc n) : BooleanFunc n :=
-  ∑ S, fourier_coeff f S • chi S
+def fourier_transform' (f : BooleanFunc n) : BooleanFunc n :=
+  ∑ S, fourier_coeff f S • χₛ S
+
+noncomputable
+def fourier_transform : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
+  toFun f := fourier_transform' f
+  map_add' := by sorry
+  map_smul' := by sorry
 
 lemma inner_eq_expect (f g : BooleanFunc n) :
    ⟪f, g⟫ = 𝐄 (f * g) := rfl
@@ -290,6 +308,16 @@ theorem parseval' (f : BooleanFunc n) :
   simp [plancherel']
   simp_rw [← sq]
 
+-- most basic probability notion, maybe this is bad because we need instances?
+noncomputable def Prob (P : Cube n → Prop) [DecidablePred P] : ℝ :=
+  (Finset.univ.filter P).card / (Fintype.card (Cube n) : ℝ)
+
+-- def 1.10
+noncomputable
+def hamming_dist (f g : Cube n → ZMod 2) :=
+  Prob (fun x => f x ≠ g x)
+
+
 -- fact 1.12
 lemma expectation_f_eq_fourier_coeff_emptyset (f : BooleanFunc n) : 𝐄 f = fourier_coeff f ∅ := by
   rw [← mul_one f];
@@ -318,7 +346,6 @@ abbrev Var (f : BooleanFunc n) : ℝ :=
 noncomputable
 abbrev Var' (f : BooleanFunc n) : ℝ :=
   ⟪fun x => f x - 𝐄 f, fun x => f x - 𝐄 f⟫
-
 
 
 noncomputable
@@ -378,6 +405,7 @@ lemma weight_eq_degree_part_norm (f : BooleanFunc n) (k : ℕ) :
   unfold weight
   sorry
 
+-- Section: densities and probability under a density
 structure Density (n : ℕ) where
   phi : BooleanFunc n
   nonneg : ∀ x, 0 ≤ phi x
@@ -392,6 +420,8 @@ theorem expectation_density (d : Density n) (f : BooleanFunc n) :
   unfold inner
   rfl
 
+
+
 lemma expectation_equiv {n : ℕ} (e : Cube n ≃ Cube n) (f : BooleanFunc n) :
     𝐄 (fun x ↦ f (e x)) = 𝐄 f := by
   unfold expectation
@@ -402,7 +432,6 @@ lemma expectation_equiv {n : ℕ} (e : Cube n ≃ Cube n) (f : BooleanFunc n) :
 noncomputable def convolution (f g : BooleanFunc n) : BooleanFunc n :=
   fun x => 𝐄 (fun y => f y * g (x + y))
 
--- Notation for convenience
 infixr:70 " ∗ " => convolution
 
 @[simp]
@@ -410,6 +439,8 @@ lemma cube_add_self (x : Cube n) : x + x = 0 := by
   ext i
   simp [Pi.add_apply]
   rw [ZModModule.add_self]
+
+-- Notation for convenience
 
 
 theorem convolution_comm (f g : BooleanFunc n) : f ∗ g = g ∗ f := by
@@ -486,9 +517,8 @@ lemma fourier_coeff_conv : fourier_coeff (f ∗ g) = fourier_coeff f * fourier_c
   unfold fourier_coeff
   ext S
   simp_rw [inner_eq_expect]; unfold convolution
-  change 𝐄 (fun x ↦ (𝐄 fun y ↦ f y * g (x + y)) * χₛ S x) = _
-  rw [expectation_expectation_product]
-  rw [expectation_comm]
+  change 𝐄 (fun x ↦ (𝐄 fun y ↦ f y * g (x + y)) * χₛ S x) = _ -- TODO
+  rw [expectation_expectation_product, expectation_comm]
   conv_lhs =>
     enter [1]
     ext y
@@ -504,43 +534,42 @@ lemma fourier_coeff_conv : fourier_coeff (f ∗ g) = fourier_coeff f * fourier_c
   simp_rw [← expectation_mul_const, expectation_const_mul, Pi.mul_apply]
   simp_rw [mul_comm]
 
-theorem fourier_convolution : fourier_transform (f ∗ g) = (fourier_transform f) * (fourier_transform g) := by
-  unfold fourier_transform
-  rw [fourier_coeff_conv]
-  simp
-  sorry
+-- Chapter 2: Influences and derivations
+-- def 2.25
 
 def update_bit (x : Cube n) (i : Fin n) (b : ZMod 2) : Cube n :=
   fun j => if j = i then b else x j
 
-noncomputable -- care here with the convetion since this is given as hamming bools
-def ddo (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
-  fun x => (f (update_bit x i 0) - f (update_bit x i 1)) / 2
+lemma update_bit_same {b : ZMod 2} {x : Cube n} {i : Fin n} (h : x i = b) :
+  update_bit x i b = x := by
+  ext j; by_cases hj : j = i <;> simp [update_bit, hj, h]
 
-theorem ddo_linear (i : Fin n) (f g : BooleanFunc n) (a b : ℝ) :
-  ddo i (a • f + b • g) = a • ddo i f + b • ddo i g := by
-  unfold ddo
-  simp
-  ext x
-  simp
-  ring
+def flip_bit (i : Fin n) (x : Cube n) : Cube n :=
+  update_bit x i (1 - x i)
 
--- TODO too long
+noncomputable
+def Ddo (i : Fin n): BooleanFunc n →ₗ[ℝ] BooleanFunc n where
+  toFun f := fun x => (f (update_bit x i 0) - f (update_bit x i 1)) / 2
+  map_add' f g  := by
+    ext x; simp [sub_add_sub_comm]; ring
+  map_smul' c f := by
+    ext x; simp [mul_sub]; ring
+
 @[simp]
-lemma char_update_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) (b : ZMod 2) :
+private lemma char_update_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) (b : ZMod 2) :
     χₛ S (update_bit x i b) = χ b * χₛ (S.erase i) x := by
   rw [char_split (update_bit x i b) S i hi]
   congr 1
   . simp [update_bit]
-  . unfold χₛ; simp [update_bit]; apply Finset.prod_congr rfl;
+  . unfold χₛ chi; simp [update_bit]; apply Finset.prod_congr rfl;
     intro x_1 hx_1
     have hne : x_1 ≠ i := Finset.ne_of_mem_erase hx_1
     rw [if_neg hne]
 
 @[simp]
-lemma char_update_non_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∉ S) (b : ZMod 2) :
-    χₛ S (update_bit x i b) = χₛ S x := by
-  unfold χₛ
+private lemma char_update_non_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∉ S) (b : ZMod 2) :
+    chi S (update_bit x i b) = chi S x := by
+  unfold chi
   apply Finset.prod_congr rfl
   intro j hj
   have hne : j ≠ i := by
@@ -549,18 +578,29 @@ lemma char_update_non_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi :
     exact hi hj
   simp [update_bit, hne]
 
+-- We can reasonably do this in one probably
 lemma char_update (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (b : ZMod 2) :
-  χₛ S (update_bit x i b) = if i ∈ S then χ b * χₛ (S.erase i) x else χₛ S x := by
+  chi S (update_bit x i b) = if i ∈ S then χ b * chi (S.erase i) x else chi S x := by
   split_ifs with h
   . simp [char_update_member _ _ _ h]
   . simp [char_update_non_member _ _ _ h]
 
 lemma ddo_char (i : Fin n) (S : Finset (Fin n)) :
-  ddo i (χₛ S) = if i ∈ S then χₛ (S.erase i) else 0 := by
+  Ddo i (chi S) = if i ∈ S then χₛ (S.erase i) else 0 := by
   funext
-  simp [ddo]
+  simp [Ddo]
   simp [char_update, char_update, χ]
   split_ifs with hi <;> simp
+
+lemma Ddo_eq_fourier_sum :
+  Ddo i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff f S) • χₛ (S.erase i) := by
+  simp
+  rw [fourier_expansion f]
+  rw [map_sum]
+  simp_rw [map_smul, ddo_char]
+  simp
+  rw [← fourier_expansion]
+  rw [Finset.sum_filter]
 
 noncomputable
 def expect_i (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
@@ -571,17 +611,19 @@ lemma expect_i_linear (i : Fin n) : IsLinearMap ℝ (expect_i i) := by
   · intros f g; ext x; unfold expect_i; simp; ring
   · intros c f; ext x; unfold expect_i; simp; ring
 
-noncomputable abbrev Di (i : Fin n) (f : BooleanFunc n) := ddo i f
-noncomputable abbrev Ei (i : Fin n) (f : BooleanFunc n) := expect_i i f
+noncomputable
+def Ei (i : Fin n) : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
+  toFun f := fun x => (f (update_bit x i 0) + f (update_bit x i 1)) / 2
+  map_add' f g := by
+    ext x; simp; ring
+  map_smul' c f := by
+    ext x; simp; ring
 
-lemma update_bit_same {b : ZMod 2} {x : Cube n} {i : Fin n} (h : x i = b) :
-  update_bit x i b = x := by
-  ext j; by_cases hj : j = i <;> simp [update_bit, hj, h]
+
 
 theorem decomposition (i : Fin n) (f : BooleanFunc n) (x : Cube n) :
-    f x = (χ (x i)) * (Di i f x) + (Ei i f x) := by
-  unfold Di Ei
-  unfold ddo expect_i
+    f x = (χ (x i)) * (Ddo i f x) + (Ei i f x) := by
+  unfold Ddo Ei
   field_simp
   rw [mul_sub]
   let val := x i
@@ -593,32 +635,34 @@ theorem decomposition (i : Fin n) (f : BooleanFunc n) (x : Cube n) :
       simp [χ, update_bit_same h]
       ring
 
--- def 2.25
-noncomputable
-abbrev Li (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
-  fun x => f x - Ei i f x
 
-def flip_bit (i : Fin n) (x : Cube n) : Cube n :=
-  update_bit x i (1 - x i)
 
+noncomputable def Li (i : Fin n) : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
+  toFun f := fun x => f x - Ei i f x
+  map_add' f g := by sorry
+  map_smul' c f := by sorry
+
+-- alternate definition
 noncomputable
 def Li' (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
   fun x => (f x - f (flip_bit i x)) / 2
 
 lemma Li_eq_chi_mul_Di (i : Fin n) (f : Cube n → ℝ) (x : Cube n) :
-    Li i f x = χ (x i) * Di i f x := by
-  unfold Li Di
+    Li i f x = χ (x i) * Ddo i f x := by
+  unfold Li Ddo
   match h : x i with
   | 0 =>
     simp [h, χ]
-    unfold ddo Ei expect_i
+    unfold Ei
     simp [update_bit_same h]
     ring
   | 1 =>
     simp [h, χ]
-    unfold ddo Ei expect_i
+    unfold Ei
     simp [update_bit_same h]
     ring
+
+
 
 lemma update_bit_idempotent (b : ZMod 2) (i : Fin n) (x : Cube n) :
   update_bit (update_bit x i b) i b = update_bit x i b := by
@@ -633,7 +677,7 @@ theorem Li_idempotent (i : Fin n) (f : BooleanFunc n) :
   ext x
   unfold Li
   simp
-  unfold Ei expect_i
+  unfold Ei
   match h : x i with
   | 0 =>
     simp [update_bit_same h]
@@ -660,13 +704,6 @@ theorem Li_idempotent (i : Fin n) (f : BooleanFunc n) :
   | 1 =>
     sorry -/
 
-noncomputable
-def dgo (f : BooleanFunc n) : Cube n → (Fin n → ℝ) :=
-  fun x => fun j => ddo j f x
-
-noncomputable
-def L (f : BooleanFunc n) : BooleanFunc n :=
-  fun x => ∑ i, Li i f x
 
 def pivotal {α : Type*} [DecidableEq α] (f : Cube n → α) (i : Fin n) (x : Cube n) : Prop :=
   f x ≠ f (flip_bit i x)
@@ -675,12 +712,16 @@ noncomputable
 instance (f : Cube n → ℝ) (i : Fin n) : DecidablePred (pivotal f i) :=
   fun x => inferInstanceAs (Decidable (f x ≠ f (flip_bit i x)))
 
-noncomputable def influence (i : Fin n) (f : Cube n → ℝ) : ℝ :=
-  (∑ x, if f x ≠ f (flip_bit i x) then (1 : ℝ) else 0) / (Fintype.card (Cube n))
+--noncomputable def influence (i : Fin n) (f : Cube n → ℝ) : ℝ :=
+--  (∑ x, if f x ≠ f (flip_bit i x) then (1 : ℝ) else 0) / (Fintype.card (Cube n))
 
+noncomputable def influence (i : Fin n) (f : BooleanFunc n) : ℝ :=
+  𝐄 ((Ddo i f) ^ 2)
 
-noncomputable def Prob (P : Cube n → Prop) [DecidablePred P] : ℝ :=
-  (Finset.univ.filter P).card / (Fintype.card (Cube n) : ℝ)
+--noncomputable def influence' (i : Fin n) (f : BooleanFunc n) : ℝ :=
+--  ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff f S) ^ 2
+
+notation "Inf" i "[" f "]" => influence i f
 
 lemma influence_eq_prob_pivotal (i : Fin n) (f : Cube n → ℝ) :
     influence i f = Prob (pivotal f i) := by
@@ -688,6 +729,84 @@ lemma influence_eq_prob_pivotal (i : Fin n) (f : Cube n → ℝ) :
   simp
   rw [Finset.card_eq_sum_ones, Finset.sum_filter]
   simp [pivotal]
+  sorry
+
+lemma norm_sq_eq_inner : ‖f‖ ^ 2 = ⟪f, f⟫ := by
+  rw [← RCLike.re_to_real (x := ⟪f, f⟫), ← InnerProductSpace.norm_sq_eq_inner]
+
+
+lemma influence_eq_norm_ddo_sq :
+  influence i f = ‖Ddo i f‖ ^ 2 := by
+  rw [norm_sq_eq_inner]
+  unfold influence
+  rw [inner_eq_expect]
+  ring_nf
+
+
+lemma inner_prod_li_eq_infi :
+  ⟪f, Li i f⟫ = influence i f := by
+  sorry
+
+lemma influence_eq_fourier_sum :
+  influence i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff f S) ^ 2 := by
+  rw [influence_eq_norm_ddo_sq]
+  rw [norm_sq_eq_inner]
+  rw [parseval]
+  rw [Ddo_eq_fourier_sum]
+  rw [Finset.sum_filter]
+  sorry
+
+
+
+
+noncomputable
+abbrev total_influence (f : BooleanFunc n) : ℝ :=
+  ∑ i, influence i f
+
+notation "𝐈[" f "]" => total_influence f
+
+
+
+noncomputable
+def dgo (f : BooleanFunc n) : Cube n → (Fin n → ℝ) :=
+  fun x => fun j => Ddo j f x
+
+noncomputable
+def Laplacian : BooleanFunc n →ₗ[ℝ] BooleanFunc n := {
+  toFun f := fun x => ∑ i, Li i f x
+  map_add' f g := by
+    ext x
+    simp [Finset.sum_add_distrib]
+  map_smul' c f := by
+    sorry
+}
+
+variable {f g : BooleanFunc n}
+
+lemma inner_prod_laplacian_eq_total_inf :
+  ⟪f, Laplacian f⟫ = 𝐈[f] := by
+  unfold Laplacian total_influence
+  simp
+  simp_rw [← Finset.sum_apply]
+  simp
+  have h_lift : (fun x ↦ ∑ c, (Li c) f x) = ∑ c, Li c f := by
+    ext x
+    simp
+  simp_rw [h_lift, inner_sum, inner_prod_li_eq_infi]
+
+lemma total_inf_eq_fourier_sum :
+  𝐈[f] = ∑ S, #S * (fourier_coeff f S) ^ 2 := by
+  sorry
+
+lemma total_inf_eq_fourier_weight_sum :
+  𝐈[f] = ∑ k : (Fin n), k * weight f k := by
+  sorry
+
+-- Poincare inequality
+theorem var_leq_total_inf :
+  Var f ≤ 𝐈[f] := by
+  sorry
+
 
 noncomputable
 def ProbPair (P : Cube n × Cube n → Prop) [DecidablePred P] : ℝ :=

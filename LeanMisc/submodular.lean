@@ -72,6 +72,7 @@ open Pointwise
 lemma insert_i_A_inter_B_eq_B_if_i_nin_B  (A B : Finset E) (hAB : A ⊆ B) (hi : i ∉ B) :
   insert i A ∩ B = B := by
     ext x
+    sorry
 
 lemma diminishing_imp_submodular (f : Finset E → ℝ)
     (h_dim : ∀ A B : Finset E, A ⊆ B → ∀ i : E, i ∉ B →
@@ -96,23 +97,8 @@ lemma diminishing_imp_submodular (f : Finset E → ℝ)
   | empty =>
       simp
   | insert hi hs =>
-      
-      -- Rewrite current goal using the inductive step
-      -- f(B ∪ (s ∪ {i})) - f(B) ≤ f((A\s\i) ∪ (s ∪ {i})) - f(A\s\i)
-      -- This part usually requires telescope summation or
-      -- applying h_dim to the "top" element i.
-      rename_i _ _ i s 
-      have h1 : f (insert i (B ∪ s)) - f (B ∪ s) ≤ f (insert i (B ∩ A ∪ s)) - f (B ∩ A ∪ s) := by
-        apply h_dim
-        · -- B ∩ A ∪ s ⊆ B ∪ s
-          intro x; simp; tauto
-        · -- i ∉ B ∪ s
-          simp at hi; simp [hi]; intro hb;
-          -- i is from A \ B, so i cannot be in B
-          have : i ∈ A \ B := by sorry -- follows from D definition
-          simp at this; tauto
-      simp
-      
+    sorry
+
 
 
 lemma isSubmodular_iff_diminishing (f : Finset E → ℝ):
@@ -139,4 +125,4 @@ lemma isSubmodular_iff_diminishing (f : Finset E → ℝ):
     unfold marginalGain
     rw [h_inf, h_sup] at h
     linarith
-  . intro h_dim A B
+  . sorry

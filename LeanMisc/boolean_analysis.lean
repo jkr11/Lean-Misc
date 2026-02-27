@@ -96,17 +96,6 @@ lemma inpr_eq_expectation (f g : BooleanFunc n) :
   simp
 
 
-/-abbrev Ω (n : ℕ) := Fin n → ZMod 2
-
-noncomputable def P (n : ℕ) : Measure (Ω n) :=
-  (1 / 2 : ENNReal) ^ n • Measure.count
-
-lemma expectation_eq_integral (f : Ω n → ℝ) :
-    expectation f = ∫ x, f x ∂(P n) := by
-  simp [expectation, P, integral_smul_measure, integral_fintype]
-  rw [mul_comm] -- Why?
-  congr-/
-
 lemma expectation_walsh_bit_eq_zero (i : Fin n) :
   expectation (fun x => χ (x i)) = 0 := by
   dsimp [expectation]
@@ -155,9 +144,11 @@ lemma expectation_walsh_bit_eq_zero (i : Fin n) :
   unfold χ
   linarith [h_self_neg]
 
-lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
-    expectation (chi S) = 0 := by
-  sorry
+lemma char_split (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) :
+  χₛ S x = χ (x i) * χₛ (S.erase i) x := by
+  unfold χₛ
+  rw [mul_comm, ← Finset.prod_erase_mul]
+  exact hi
 
 notation "⟨" f "," g "⟩" => inner_product f g
 
@@ -251,31 +242,60 @@ theorem chi_mul_chi (S T : Finset (Fin n)) (x : Fin n → ZMod 2) :
   apply disjoint_sdiff_sdiff
 
 
-lemma expectation_mul {S T : Finset (Fin n)} (hST : S ≠ T) :
+/-lemma expectation_mul {S T : Finset (Fin n)} (hST : S ≠ T) :
   𝐄 (chi S * chi T) = 𝐄 (chi S) * 𝐄 (chi T) := by
     unfold expectation
     simp [chi_mul_chi]
     have h_ne : (S ∆ T).Nonempty := by
       contrapose! hST
       exact Finset.symmDiff_eq_empty.mp (Finset.not_nonempty_iff_eq_empty.mp hST)
-    sorry
+    field_simp
+    rw [Finset.sum_mul_sum]
+    sorry-/
+
+lemma chi_add_one (i : Fin n) (x : Cube n) :
+  χ (x i + 1) = - χ (x i) := by
+  simp [chi_repr]
+  unfold chi_base_alt
+  sorry -- I dont know why these keep crashing the system. We can use fin_cases b and match h : x i elsewhere too.
+
+lemma chi_add_one' (i : Fin n) (x : Cube n) :
+  χ (x i + 1) = - χ (x i) := by
+  unfold χ
+  sorry
 
 
--- Fact 1.7
-/-lemma expectation_chi_eq_zero_ {S : Finset (Fin n)} (hS : S.Nonempty) :
-    expectation (chi S) = 0 := by
-  obtain ⟨i, hi⟩ := hS
-  unfold chi
-  rw [← Finset.insert_erase hi]
-  simp_rw [Finset.prod_insert (Finset.not_mem_erase i S)]
-  rw [expectation_eq_integral]
-  rw [IndepFun.integral_mul']
-  rw [← expectation_eq_integral]
-  rw [expectation_walsh_bit_eq_zero]
-  rw [zero_mul]
-  . sorry
-  . sorry
-  . sorry-/
+
+lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
+    expectation (χₛ S) = 0 := by
+  unfold expectation
+  suffices ∑ x, χₛ S x = 0 by simp [this]
+
+  obtain ⟨j, hj⟩ := hS
+
+  let f : Cube n ≃ Cube n := Equiv.addLeft (Pi.single j 1)
+
+  have h_neg : ∀ x, χₛ S (f x) = - χₛ S x := by
+    intro x
+    unfold χₛ
+    unfold f
+    simp [f, Pi.single_apply]
+    simp [← Finset.prod_erase_mul S _ hj]
+    rw [add_comm, chi_add_one]
+    rw [mul_neg]
+    have h_prod_eq : (∏ i in S.erase j, χ ((if i = j then 1 else 0) + x i)) = ∏ i in S.erase j, χ (x i) := by
+      apply Finset.prod_congr rfl
+      intro i hi
+      have hij : i ≠ j := Finset.ne_of_mem_erase hi
+      rw [if_neg hij]
+      rw [zero_add]
+    rw [h_prod_eq]
+
+  have h_sum := f.sum_comp (λ x => χₛ S x)
+  simp [h_neg] at h_sum
+
+  linarith [h_neg]
+
 
 theorem chi_orthonormal : Orthonormal ℝ (fun S : Finset (Fin n) => chi S) := by
   rw [orthonormal_iff_ite]
@@ -568,13 +588,7 @@ theorem ddo_linear (i : Fin n) (f g : BooleanFunc n) (a b : ℝ) :
   simp
   ring
 
-
-lemma char_split (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) :
-  χₛ S x = χ (x i) * χₛ (S.erase i) x := by
-  unfold χₛ
-  rw [mul_comm, ← Finset.prod_erase_mul]
-  exact hi
-
+-- TODO too long
 @[simp]
 lemma char_update_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) (b : ZMod 2) :
     χₛ S (update_bit x i b) = χ b * χₛ (S.erase i) x := by
@@ -598,15 +612,18 @@ lemma char_update_non_member (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi :
     exact hi hj
   simp [update_bit, hne]
 
+lemma char_update (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (b : ZMod 2) :
+  χₛ S (update_bit x i b) = if i ∈ S then χ b * χₛ (S.erase i) x else χₛ S x := by
+  split_ifs with h
+  . simp [char_update_member _ _ _ h]
+  . simp [char_update_non_member _ _ _ h]
+
 lemma ddo_char (i : Fin n) (S : Finset (Fin n)) :
   ddo i (χₛ S) = if i ∈ S then χₛ (S.erase i) else 0 := by
-  ext x
-  unfold ddo
-  split_ifs
-  . rename_i hi;
-    rw [char_update_member, char_update_member]; rw [χ, χ]; simp; all_goals (exact hi)
-  . rename_i hi;
-    rw [char_update_non_member, char_update_non_member]; ring_nf; simp; all_goals (exact hi)
+  funext
+  simp [ddo]
+  simp [char_update, char_update, χ]
+  split_ifs with hi <;> simp
 
 noncomputable
 def expect_i (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
@@ -713,3 +730,51 @@ def dgo (f : BooleanFunc n) : Cube n → (Fin n → ℝ) :=
 noncomputable
 def L (f : BooleanFunc n) : BooleanFunc n :=
   fun x => ∑ i, Li i f x
+
+def pivotal {α : Type*} [DecidableEq α] (f : Cube n → α) (i : Fin n) (x : Cube n) : Prop :=
+  f x ≠ f (flip_bit i x)
+
+noncomputable
+instance (f : Cube n → ℝ) (i : Fin n) : DecidablePred (pivotal f i) :=
+  fun x => inferInstanceAs (Decidable (f x ≠ f (flip_bit i x)))
+
+noncomputable def influence (i : Fin n) (f : Cube n → ℝ) : ℝ :=
+  (∑ x, if f x ≠ f (flip_bit i x) then (1 : ℝ) else 0) / (Fintype.card (Cube n))
+
+
+noncomputable def Prob (P : Cube n → Prop) [DecidablePred P] : ℝ :=
+  (Finset.univ.filter P).card / (Fintype.card (Cube n) : ℝ)
+
+lemma influence_eq_prob_pivotal (i : Fin n) (f : Cube n → ℝ) :
+    influence i f = Prob (pivotal f i) := by
+  unfold influence Prob
+  simp
+  rw [Finset.card_eq_sum_ones, Finset.sum_filter]
+  simp [pivotal]
+
+noncomputable
+def ProbPair (P : Cube n × Cube n → Prop) [DecidablePred P] : ℝ :=
+  (Finset.univ.filter P).card / (Fintype.card (Cube n × Cube n) : ℝ)
+
+noncomputable def expectation_gen {α : Type*} [Fintype α] (g : α → ℝ) : ℝ :=
+  (∑ x, g x) / (Fintype.card α : ℝ)
+
+/-- The "Noise Weight" between two strings based on their correlation ρ -/
+def noise_weight (ρ : ℝ) (x y : Cube n) : ℝ :=
+  ∏ i, if y i = x i then (1 + ρ) else (1 - ρ)
+
+noncomputable def Stab (ρ : ℝ) (f : BooleanFunc n) : ℝ :=
+  expectation_gen (fun (pair : Cube n × Cube n) =>
+    let (x, y) := pair
+    (noise_weight ρ x y) * f x * f y
+  )
+
+noncomputable def noise_sensitivity (δ : ℝ) (f : BooleanFunc n) : ℝ :=
+  (1/2 : ℝ) - (1/2 : ℝ) * Stab (1 - 2 * δ) f
+
+noncomputable
+def bit_weight (ρ : ℝ) (xi yi : ZMod 2) : ℝ :=
+  if yi = xi then (1 + ρ) / 2 else (1 - ρ) / 2
+
+noncomputable def T (ρ : ℝ) (f : BooleanFunc n) : BooleanFunc n :=
+  fun x => ∑ y, (∏ i, bit_weight ρ (x i) (y i)) * f y

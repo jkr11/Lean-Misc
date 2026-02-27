@@ -95,55 +95,6 @@ lemma inpr_eq_expectation (f g : BooleanFunc n) :
   unfold expectation
   simp
 
-
-lemma expectation_walsh_bit_eq_zero (i : Fin n) :
-  expectation (fun x => χ (x i)) = 0 := by
-  dsimp [expectation]
-  simp [mul_eq_zero]
-  let σ : (Fin n → ZMod 2) → (Fin n → ZMod 2) := fun x => Function.update x i (x i + 1)
-  have h_bij : Function.Bijective σ := by
-    apply Function.bijective_iff_has_inverse.mpr
-    use σ
-    constructor <;>
-    · intro x; ext j
-      by_cases h : j = i
-      · simp [σ, h, add_assoc, ZMod.intCast_cast_add]; native_decide
-      · simp [σ, h]
-
-  have h_neg : ∀ x, (if (σ x) i = 0 then (1:ℝ) else -1) = -(if x i = 0 then 1 else -1) := by
-    intro x
-    simp only [σ, Function.update_self]
-    have h_flip : (x i + 1 = 0) ↔ (x i ≠ 0) := by
-      have h_cases := ZMod.val_lt (x i)
-      revert h_cases; norm_num
-      intro h; interval_cases h_val : (x i).val
-      . have : x i = 0 := ZMod.val_injective 2 h_val; simp [this]
-      . have : x i = 1 := ZMod.val_injective 2 h_val; simp [this]; congr
-    simp [h_flip]
-    by_cases h : x i = 0
-    . simp [h]
-    . simp [h]
-
-  have h_reindex : (∑ (x : Cube n), if x i = 0 then (1:ℝ) else -1) = ∑ x, if σ x i = 0 then 1 else -1 := by
-    rw [Fintype.sum_bijective σ h_bij]
-    intro x
-    simp [h_neg]
-
-  have h_self_neg : (∑ (x : Cube n), if x i = 0 then (1:ℝ) else -1) =
-                    -∑ (x : Cube n), if x i = 0 then (1:ℝ) else -1 := by
-    calc
-      (∑ (x : Cube n), if x i = 0 then (1:ℝ) else -1)
-          = ∑ (x : Cube n), if σ x i = 0 then 1 else -1 := by
-            rw [Fintype.sum_bijective σ h_bij]
-            intro x; simp [h_neg]
-      _   = ∑ (x : Cube n), -(if x i = 0 then 1 else -1) := by
-            simp_rw [h_neg]
-      _   = -∑ (x : Cube n), if x i = 0 then 1 else -1 := by
-            rw [Finset.sum_neg_distrib]
-
-  unfold χ
-  linarith [h_self_neg]
-
 lemma char_split (x : Cube n) (S : Finset (Fin n)) (i : Fin n) (hi : i ∈ S) :
   χₛ S x = χ (x i) * χₛ (S.erase i) x := by
   unfold χₛ
@@ -242,17 +193,6 @@ theorem chi_mul_chi (S T : Finset (Fin n)) (x : Fin n → ZMod 2) :
   apply disjoint_sdiff_sdiff
 
 
-/-lemma expectation_mul {S T : Finset (Fin n)} (hST : S ≠ T) :
-  𝐄 (chi S * chi T) = 𝐄 (chi S) * 𝐄 (chi T) := by
-    unfold expectation
-    simp [chi_mul_chi]
-    have h_ne : (S ∆ T).Nonempty := by
-      contrapose! hST
-      exact Finset.symmDiff_eq_empty.mp (Finset.not_nonempty_iff_eq_empty.mp hST)
-    field_simp
-    rw [Finset.sum_mul_sum]
-    sorry-/
-
 lemma chi_add_one (i : Fin n) (x : Cube n) :
   χ (x i + 1) = - χ (x i) := by
   simp [chi_repr]
@@ -269,8 +209,7 @@ lemma chi_add_one' (i : Fin n) (x : Cube n) :
 lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
     expectation (χₛ S) = 0 := by
   unfold expectation
-  suffices ∑ x, χₛ S x = 0 by simp [this]
-
+  simp
   obtain ⟨j, hj⟩ := hS
 
   let f : Cube n ≃ Cube n := Equiv.addLeft (Pi.single j 1)
@@ -290,10 +229,8 @@ lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
       rw [if_neg hij]
       rw [zero_add]
     rw [h_prod_eq]
-
   have h_sum := f.sum_comp (λ x => χₛ S x)
   simp [h_neg] at h_sum
-
   linarith [h_neg]
 
 

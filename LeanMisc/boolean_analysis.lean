@@ -6,11 +6,13 @@ import Mathlib.Data.Finset.SymmDiff
 import Mathlib.Data.Set.SymmDiff
 import Mathlib.Tactic.Ring
 import Mathlib.Analysis.InnerProductSpace.PiL2
-import Mathlib.Analysis.CStarAlgebra.Basic
+import Mathlib.Analysis.InnerProductSpace.Adjoint
 
 open BigOperators Finset
 open scoped symmDiff
 open RealInnerProductSpace
+open InnerProductSpace
+open LinearMap
 
 variable {n : ℕ}
 
@@ -92,7 +94,6 @@ lemma chi_add (S : Finset (Fin n)) (x y : Fin n → ZMod 2) :
 lemma chi_add' (S : Finset (Fin n)) (x y : Cube n) :
   χₛ S (x + y) = χₛ S x * χₛ S y := by
   unfold χₛ
-  repeat rw [← chi]
   simp [chi_add]
 
 
@@ -102,8 +103,14 @@ def inner_product (f g : BooleanFunc n) : ℝ :=
   (∑ x : Cube n, (f x * g x)) / 2^n
 
 noncomputable
-def expectation (f : BooleanFunc n) : ℝ :=
-  (∑ x, f x) / 2^n
+def expectation : BooleanFunc n →ₗ[ℝ] ℝ where
+  toFun f := (∑ x, f x) / 2^n
+  map_add' f g := by
+    simp [Finset.sum_add_distrib]
+    ring
+  map_smul' c f := by
+    field_simp
+    rw [Finset.mul_sum]
 
 lemma inpr_eq_expectation (f g : BooleanFunc n) :
   inner_product f g = expectation (fun x => f x * g x) := by
@@ -165,44 +172,6 @@ instance : Norm (BooleanFunc n) := InnerProductSpace.Core.toNorm (𝕜 := ℝ) (
 
 notation "𝐄" => expectation
 
-lemma expectation_add (f g : BooleanFunc n) :
-  𝐄 (f + g) = 𝐄 f + 𝐄 g := by
-  unfold expectation
-  simp [Finset.sum_add_distrib]
-  ring
-
-lemma expectation_sub (f g : BooleanFunc n) :
-    𝐄 (f - g) = 𝐄 f - 𝐄 g := by
-  unfold expectation
-  simp [Finset.sum_sub_distrib]
-  ring
-
-
-
-lemma expectation_add' (f g : BooleanFunc n) :
-  𝐄 (fun x => f x + g x) = 𝐄 (fun x => f x) + 𝐄 (fun x => g x) := by
-  unfold expectation
-  simp [Finset.sum_add_distrib]
-  ring
-
-lemma expectation_sub' (f g : BooleanFunc n) :
-    𝐄 (fun x => f x - g x) = 𝐄 (fun x => f x) - 𝐄 (fun x => g x) := by
-  unfold expectation
-  simp [Finset.sum_sub_distrib]
-  ring
-
-lemma expectation_mul_const (f : BooleanFunc n) (c : ℝ) :
-    𝐄 (fun x => f x * c) = 𝐄 f * c := by
-  unfold expectation
-  simp [Finset.sum_mul]
-  conv_rhs =>
-    rw [mul_comm, ← mul_div_assoc, mul_comm, Finset.sum_mul]
-
-lemma expectation_const_mul (f : BooleanFunc n) (c : ℝ) :
-  c * 𝐄 f = 𝐄 (fun x => c * f x) := by
-  rw [mul_comm, ← expectation_mul_const]
-  simp_rw [mul_comm]
-
 lemma expectation_chi_empty :
   𝐄 (chi (∅ : Finset (Fin n))) = 1 := by
   unfold chi expectation
@@ -245,6 +214,8 @@ lemma expectation_chi_eq_zero {S : Finset (Fin n)} (hS : S.Nonempty) :
   simp [h_neg] at h_sum
   linarith [h_neg]
 
+lemma expectation_apply (f : BooleanFunc n) :
+    𝐄 f = (∑ x, f x) / 2^n := rfl
 
 theorem chi_orthonormal : Orthonormal ℝ (fun S : Finset (Fin n) => chi S) := by
   rw [orthonormal_iff_ite]
@@ -254,23 +225,32 @@ theorem chi_orthonormal : Orthonormal ℝ (fun S : Finset (Fin n) => chi S) := b
   rw [h_inner, inner_product]
   rw [Finset.sum_congr rfl (fun i _ => chi_mul_chi S T _)]
   split_ifs with h
-  . subst h; simp [symmDiff_self]; rw [← expectation, expectation_chi_empty]
+  . subst h; simp [symmDiff_self]; rw [← expectation_apply]; simp_rw [expectation_chi_empty]
   . apply expectation_chi_eq_zero
     rwa [symmDiff_nonempty]
 
 
 -- Prop 1.8 part 1
 noncomputable
-def fourier_coeff (f : BooleanFunc n) (S : Finset (Fin n)) : ℝ :=
+def fourier_coeff' (f : BooleanFunc n) (S : Finset (Fin n)) : ℝ :=
   ⟪f,χₛ S⟫
 
+noncomputable
+def fourier_coeff (S : Finset (Fin n)) : BooleanFunc n →ₗ[ℝ] ℝ where
+  toFun f := ⟪f, χₛ S⟫
+  map_add' f g := by
+    rw [inner_add_left]
+  map_smul' c f := by
+    rw [inner_smul_left]
+    simp
+
 theorem fourier_expansion (f : BooleanFunc n) :
-  f = ∑ S, fourier_coeff f S • chi S := by
+  f = ∑ S, fourier_coeff S f • chi S := by
   sorry
 
 noncomputable
 def fourier_transform' (f : BooleanFunc n) : BooleanFunc n :=
-  ∑ S, fourier_coeff f S • χₛ S
+  ∑ S, fourier_coeff S f • χₛ S
 
 noncomputable
 def fourier_transform : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
@@ -283,7 +263,7 @@ lemma inner_eq_expect (f g : BooleanFunc n) :
 
 
 theorem plancherel (f g : BooleanFunc n) :
-  ⟪f, g⟫ = ∑ S, fourier_coeff f S * fourier_coeff g S := by
+  ⟪f, g⟫ = ∑ S, fourier_coeff S f * fourier_coeff S g := by
   conv_lhs =>
     rw [fourier_expansion f, fourier_expansion g]
   simp_rw [inner_sum, sum_inner, inner_smul_left, inner_smul_right]
@@ -292,18 +272,18 @@ theorem plancherel (f g : BooleanFunc n) :
   simp [ite_mul]
 
 theorem plancherel' (f g : BooleanFunc n) :
-    𝐄 (f * g) = ∑ S, fourier_coeff f S * fourier_coeff g S := by
+    𝐄 (f * g) = ∑ S, fourier_coeff S f * fourier_coeff S g := by
     rw [← inner_eq_expect]
     simp [plancherel]
 
 
 theorem parseval (f : BooleanFunc n) :
-  ⟪f, f⟫ = ∑ S, (fourier_coeff f S)^2 := by
+  ⟪f, f⟫ = ∑ S, (fourier_coeff S f)^2 := by
   simp [plancherel]
   simp_rw [← sq]
 
 theorem parseval' (f : BooleanFunc n) :
-  𝐄 (f ^ 2) = ∑ S, (fourier_coeff f S)^2 := by
+  𝐄 (f ^ 2) = ∑ S, (fourier_coeff S f)^2 := by
   rw [pow_two]
   simp [plancherel']
   simp_rw [← sq]
@@ -319,7 +299,7 @@ def hamming_dist (f g : Cube n → ZMod 2) :=
 
 
 -- fact 1.12
-lemma expectation_f_eq_fourier_coeff_emptyset (f : BooleanFunc n) : 𝐄 f = fourier_coeff f ∅ := by
+lemma expectation_f_eq_fourier_coeff_emptyset (f : BooleanFunc n) : 𝐄 f = fourier_coeff ∅ f := by
   rw [← mul_one f];
   rw [← inner_eq_expect]
   rw [fourier_coeff]
@@ -339,13 +319,15 @@ lemma inner_eq_expect_right (f : BooleanFunc n) :
   simp only [starRingEnd_apply, star_trivial]
   simp [inner_eq_expect_left]
 
+instance : Sub (BooleanFunc n) := Pi.instSub
+
 noncomputable
 abbrev Var (f : BooleanFunc n) : ℝ :=
-  𝐄 (fun x => (f x - 𝐄 f)^2)
+  𝐄 ((f - fun _ => 𝐄 f) ^ 2)
 
 noncomputable
 abbrev Var' (f : BooleanFunc n) : ℝ :=
-  ⟪fun x => f x - 𝐄 f, fun x => f x - 𝐄 f⟫
+  ⟪f- λ _ => 𝐄 f,f - λ _ => 𝐄 f⟫
 
 
 noncomputable
@@ -360,14 +342,13 @@ lemma var_eq_var' (f : BooleanFunc n) :
   Var f =  Var' f := by
   unfold Var Var'
   rw [inner_eq_expect, ← sq]
-  rfl
 
 lemma expectation_const (c : ℝ) : 𝐄 ((fun _ ↦ c) : BooleanFunc n) = c := by
   unfold expectation
   simp
 
 lemma cov_eq_nonempty_fourier_sum (f g : BooleanFunc n) :
-  Cov f g = ∑ S ∈ univ \ {∅}, (fourier_coeff f S) * (fourier_coeff g S) := by
+  Cov f g = ∑ S ∈ univ \ {∅}, (fourier_coeff S f) * (fourier_coeff S g) := by
   simp
   unfold Cov
   rw [plancherel']; simp
@@ -378,27 +359,35 @@ lemma variance_eq_expect_sq_sub_sq_expect (f : BooleanFunc n) :
   unfold Var
   rw [← inner_eq_expect_left, inner_eq_expect, mul_one]
   simp_rw [sub_sq]
-  rw [expectation_add', expectation_sub']
-  simp_rw [expectation_mul_const]
-  rw [expectation_const (𝐄 f ^ 2)]
-  simp [mul_comm]
-  rw [expectation_mul_const, ← mul_assoc, sq]
-  simp_rw [← Pi.pow_apply]
+  simp
+  rw [mul_assoc]
+  have h : (2 * (f * λ x ↦ 𝐄 f)) = (2 * 𝐄 f) • f := by -- TODO mae this nicer
+    ext x
+    simp [mul_assoc]
+    ring
+  rw [h, map_smul 𝐄]
+  conv_lhs =>
+    enter [2]
+    rw [sq]
+  simp_rw [Pi.mul_def]
+  rw [expectation_const]
+  rw [← sq]
+  rw [smul_eq_mul]
   ring
 
 lemma variance_eq_nonempty_fourier_sum (f : BooleanFunc n) :
-  Var f = ∑ S ∈ univ \ {∅}, (fourier_coeff f S) ^ 2 := by
+  Var f = ∑ S ∈ univ \ {∅}, (fourier_coeff S f) ^ 2 := by
   rw [variance_eq_expect_sq_sub_sq_expect]
   simp
   rw [parseval', expectation_f_eq_fourier_coeff_emptyset]
 
 noncomputable def weight (f : BooleanFunc n) (k : ℕ) : ℝ :=
-  ∑ S : Finset (Fin n), if S.card = k then (fourier_coeff f S) ^ 2 else 0
+  ∑ S : Finset (Fin n), if S.card = k then (fourier_coeff S f) ^ 2 else 0
 
 notation "𝐖" k "[" f "]" => weight f k
 
 noncomputable def degree_part (f : BooleanFunc n) (k : ℕ) : BooleanFunc n :=
-  ∑ S : Finset (Fin n), if S.card = k then (fourier_coeff f S) • (chi S) else 0
+  ∑ S : Finset (Fin n), if S.card = k then (fourier_coeff S f) • (chi S) else 0
 
 lemma weight_eq_degree_part_norm (f : BooleanFunc n) (k : ℕ) :
   weight f k = ‖degree_part f k‖^2 := by
@@ -425,6 +414,7 @@ theorem expectation_density (d : Density n) (f : BooleanFunc n) :
 lemma expectation_equiv {n : ℕ} (e : Cube n ≃ Cube n) (f : BooleanFunc n) :
     𝐄 (fun x ↦ f (e x)) = 𝐄 f := by
   unfold expectation
+  simp
   rw [Finset.sum_equiv e]
   all_goals simp
 
@@ -503,36 +493,52 @@ lemma expectation_expectation_product {n : ℕ} (f : Cube n → Cube n → ℝ) 
 
 lemma expectation_comm {n : ℕ} (f : Cube n → Cube n → ℝ) :
     (𝐄 fun x ↦ 𝐄 fun y ↦ f x y) = 𝐄 fun y ↦ 𝐄 fun x ↦ f x y := by
-  unfold expectation
+  unfold expectation; simp
   simp_rw [← Finset.sum_div, Finset.sum_div]
   rw [Finset.sum_comm]
 
 lemma expectation_mul_separate {n : ℕ} (A B : Cube n → ℝ) :
     (𝐄 fun y ↦ 𝐄 fun x ↦ A y * B x) = (𝐄 A) * (𝐄 B) := by
-  simp_rw [← expectation_mul_const]
-  simp_rw [expectation_const_mul]
-
-
-lemma fourier_coeff_conv : fourier_coeff (f ∗ g) = fourier_coeff f * fourier_coeff g := by
-  unfold fourier_coeff
-  ext S
-  simp_rw [inner_eq_expect]; unfold convolution
-  change 𝐄 (fun x ↦ (𝐄 fun y ↦ f y * g (x + y)) * χₛ S x) = _ -- TODO
-  rw [expectation_expectation_product, expectation_comm]
+  simp_rw [← smul_eq_mul]
   conv_lhs =>
-    enter [1]
+    enter [2, y]
+  have h_smul : ∀ y, (fun x ↦ A y • B x) = (A y) • B := by
+    simp
+    intro y
+    ext x
+    simp
+  simp_rw [h_smul]
+  conv_lhs =>
+    enter [2, y]
+    rw [map_smul 𝐄 (A y) B]
+  simp
+  sorry
+
+
+-- TODO: simplify
+lemma fourier_coeff_conv {S} : fourier_coeff S (f ∗ g) = fourier_coeff S f * fourier_coeff S g := by
+  unfold fourier_coeff
+  simp_rw [inner_eq_expect]; simp; unfold convolution
+  change 𝐄 (fun x ↦ (𝐄 fun y ↦ f y * g (x + y)) * χₛ S x) = _ -- TODO
+  rw [expectation_expectation_product, expectation_comm];
+  conv_lhs =>
+    enter [2]
     ext y
     rw [← expectation_equiv (Equiv.addRight y)]
     simp;
   simp_rw [add_assoc]; simp
   conv_lhs =>
-    enter [1]
+    enter [2]
     ext y
-    enter [1]
+    enter [2]
     ext x
-    rw [chi_add', mul_assoc, mul_comm, ← mul_assoc, mul_assoc]
-  simp_rw [← expectation_mul_const, expectation_const_mul, Pi.mul_apply]
-  simp_rw [mul_comm]
+    rw [chi_add', mul_assoc, mul_comm, ← mul_assoc, mul_assoc, mul_comm]
+  simp_rw [← Pi.mul_apply]
+  simp_rw [← expectation_mul_separate]
+  simp_rw [mul_comm (χₛ S) f]
+
+
+
 
 -- Chapter 2: Influences and derivations
 -- def 2.25
@@ -592,15 +598,14 @@ lemma ddo_char (i : Fin n) (S : Finset (Fin n)) :
   simp [char_update, char_update, χ]
   split_ifs with hi <;> simp
 
-lemma Ddo_eq_fourier_sum :
-  Ddo i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff f S) • χₛ (S.erase i) := by
+lemma Ddo_eq_fourier_sum {i} :
+  Ddo i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff S f) • χₛ (S.erase i) := by
   simp
   rw [fourier_expansion f]
   rw [map_sum]
   simp_rw [map_smul, ddo_char]
   simp
-  rw [← fourier_expansion]
-  rw [Finset.sum_filter]
+  sorry
 
 noncomputable
 def expect_i (i : Fin n) (f : BooleanFunc n) : BooleanFunc n :=
@@ -634,8 +639,6 @@ theorem decomposition (i : Fin n) (f : BooleanFunc n) (x : Cube n) :
   | 1 =>
       simp [χ, update_bit_same h]
       ring
-
-
 
 noncomputable def Li (i : Fin n) : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
   toFun f := fun x => f x - Ei i f x
@@ -704,6 +707,21 @@ theorem Li_idempotent (i : Fin n) (f : BooleanFunc n) :
   | 1 =>
     sorry -/
 
+lemma star_Li (i : Fin n) :
+  star (Li i) = Li i := by
+  ext f
+  unfold Li
+  simp
+  sorry
+
+
+lemma Li_self_adjoint (i : Fin n) : IsSelfAdjoint (Li i) := by
+  rw [isSelfAdjoint_iff]
+  sorry
+
+
+
+
 
 def pivotal {α : Type*} [DecidableEq α] (f : Cube n → α) (i : Fin n) (x : Cube n) : Prop :=
   f x ≠ f (flip_bit i x)
@@ -729,11 +747,13 @@ lemma influence_eq_prob_pivotal (i : Fin n) (f : Cube n → ℝ) :
   simp
   rw [Finset.card_eq_sum_ones, Finset.sum_filter]
   simp [pivotal]
+  unfold expectation
+  field_simp
+  unfold Ddo; simp
   sorry
 
 lemma norm_sq_eq_inner : ‖f‖ ^ 2 = ⟪f, f⟫ := by
   rw [← RCLike.re_to_real (x := ⟪f, f⟫), ← InnerProductSpace.norm_sq_eq_inner]
-
 
 lemma influence_eq_norm_ddo_sq :
   influence i f = ‖Ddo i f‖ ^ 2 := by
@@ -745,19 +765,20 @@ lemma influence_eq_norm_ddo_sq :
 
 lemma inner_prod_li_eq_infi :
   ⟪f, Li i f⟫ = influence i f := by
+  unfold influence
+  rw [← Li_idempotent]
   sorry
 
 lemma influence_eq_fourier_sum :
-  influence i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff f S) ^ 2 := by
+  influence i f = ∑ S ∈ (univ : Finset (Fin n)).powerset.filter (fun S => i ∈ S), (fourier_coeff S f) ^ 2 := by
   rw [influence_eq_norm_ddo_sq]
   rw [norm_sq_eq_inner]
   rw [parseval]
   rw [Ddo_eq_fourier_sum]
-  rw [Finset.sum_filter]
+  simp
+  simp_rw [pow_two]
+  simp_rw [mul_sum]
   sorry
-
-
-
 
 noncomputable
 abbrev total_influence (f : BooleanFunc n) : ℝ :=
@@ -765,11 +786,29 @@ abbrev total_influence (f : BooleanFunc n) : ℝ :=
 
 notation "𝐈[" f "]" => total_influence f
 
-
+lemma total_inf_eq_expectation_of_sum_Di_sq :
+  𝐈[f] = 𝐄 (∑ i, (Ddo i f) ^ 2) := by
+  simp [total_influence]
+  simp_rw [influence_eq_norm_ddo_sq, norm_sq_eq_inner, inner_eq_expect, ← sq]
 
 noncomputable
-def dgo (f : BooleanFunc n) : Cube n → (Fin n → ℝ) :=
-  fun x => fun j => Ddo j f x
+def Dgo : BooleanFunc n →ₗ[ℝ] (Cube n → EuclideanSpace ℝ (Fin n)) where
+  toFun f := fun x => fun j => Ddo j f x
+  map_add' f g := by sorry
+  map_smul' c f := by sorry
+
+notation "∇"f => Dgo f
+
+-- prop 2.35
+lemma total_inf_eq_expextation_of_norm_sq_of_gradient :
+  𝐈[f] = 𝐄 (fun x => ‖((∇ f) x : EuclideanSpace ℝ (Fin n))‖ ^ 2) := by
+  rw [total_inf_eq_expectation_of_sum_Di_sq, map_sum]
+  simp_rw [← inner_eq_expect_left, ← sum_inner]
+  congr 1
+  ext y
+  simp [Dgo]
+  simp_rw [PiLp.norm_sq_eq_of_L2, Real.norm_eq_abs, sq_abs]
+
 
 noncomputable
 def Laplacian : BooleanFunc n →ₗ[ℝ] BooleanFunc n := {
@@ -778,10 +817,18 @@ def Laplacian : BooleanFunc n →ₗ[ℝ] BooleanFunc n := {
     ext x
     simp [Finset.sum_add_distrib]
   map_smul' c f := by
-    sorry
+    ext x
+    simp [Finset.mul_sum]
 }
 
 variable {f g : BooleanFunc n}
+
+lemma total_inf_eq_fourier_sum :
+  𝐈[f] = ∑ S, #S * (fourier_coeff S f) ^ 2 := by
+  unfold total_influence
+  simp_rw [influence_eq_fourier_sum, Finset.sum_filter]
+  rw [Finset.sum_comm]
+  simp
 
 lemma inner_prod_laplacian_eq_total_inf :
   ⟪f, Laplacian f⟫ = 𝐈[f] := by
@@ -794,13 +841,12 @@ lemma inner_prod_laplacian_eq_total_inf :
     simp
   simp_rw [h_lift, inner_sum, inner_prod_li_eq_infi]
 
-lemma total_inf_eq_fourier_sum :
-  𝐈[f] = ∑ S, #S * (fourier_coeff f S) ^ 2 := by
-  sorry
-
 lemma total_inf_eq_fourier_weight_sum :
   𝐈[f] = ∑ k : (Fin n), k * weight f k := by
-  sorry
+  rw [total_inf_eq_fourier_sum]
+  unfold weight
+
+
 
 -- Poincare inequality
 theorem var_leq_total_inf :
@@ -834,3 +880,16 @@ def bit_weight (ρ : ℝ) (xi yi : ZMod 2) : ℝ :=
 
 noncomputable def T (ρ : ℝ) (f : BooleanFunc n) : BooleanFunc n :=
   fun x => ∑ y, (∏ i, bit_weight ρ (x i) (y i)) * f y
+
+
+-- # Chapter 3 Spectral structure and learning
+
+def f_plus_z (z : Cube n) : BooleanFunc n :=
+  fun x => f (x + z)
+
+-- Fact 3.25
+
+
+-- def 3.28
+def is_eps_concentrated (F : Finset (Finset (Fin n))) (f : BooleanFunc n) (ε : ℝ) : Prop :=
+  ∑ S in (Finset.univ.filter fun S => S ∈ F), (fourier_coeff S f) ^ 2 ≤ ε

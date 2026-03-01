@@ -1,4 +1,4 @@
-import Mathlib.Data.Matrix.Basic
+/-import Mathlib.Data.Matrix.Basic
 -- import Mathlib.Data.Matrix.Notation
 import Mathlib.Data.Complex.Exponential
 import Mathlib.Data.Real.Basic
@@ -163,4 +163,4 @@ theorem qsp_representation (x : ℝ) (hx : -1 ≤ x ∧ x ≤ 1) (φs : List ℝ
             rw [Polynomial.map_map, h_phase_star, hphase]; simp;
             ring
           intro h
-          simp at h
+          simp at h-/

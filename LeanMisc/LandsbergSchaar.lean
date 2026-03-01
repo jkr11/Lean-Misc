@@ -1,4 +1,4 @@
-import Mathlib.Analysis.SpecialFunctions.Exp
+/-import Mathlib.Analysis.SpecialFunctions.Exp
 import Mathlib.Data.Finset.Basic
 import Mathlib.Analysis.Fourier.PoissonSummation
 import Mathlib.Data.Complex.Exponential
@@ -95,7 +95,7 @@ lemma exp_sub (a b : ℝ) :
 --   (1/n) *  ∑ x ∈ Finset.range n, f x * exp (-( (k * x) / n))
 --
 --
-/- theorem poisson_summation_theorem (p q : ℕ) :
+  theorem poisson_summation_theorem (p q : ℕ) :
    ∑ x ∈ Finset.range (2 * p * q), Complex.exp ((x ^ 2) / (4 * p * q)) =
    Complex.exp ( (- (p * q) ^ 2 / (4 * p * q))) * S (4 * p * q) := by sorry -/
 --

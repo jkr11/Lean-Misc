@@ -129,9 +129,7 @@ lemma sum_chi_ne_zero_eq_zero {z : Cube n} (hz : z ≠ 0) :
     sorry
   rw [← hu, Finset.sum_union hd]
   conv_lhs =>
-    enter [2]
-    enter [2]
-    ext x
+    enter [2, 2, x]
     -- rw [char_split z _ j]
 
   sorry
@@ -308,11 +306,7 @@ theorem fourier_expansion (f : BooleanFunc n) :
   simp_rw [mul_assoc, ← Finset.mul_sum]
   simp_rw [Finset.sum_div, ← mul_div]
   conv_rhs =>
-    enter [2]
-    intro x
-    enter [2]
-    enter [1]
-    enter [2]
+    enter [2, x, 2, 1, 2]
     intro i
     rw [← chi_add']
   -- simp_rw [sum_chi_ne_zero_eq_zero]
@@ -331,16 +325,13 @@ def fourier_transform : BooleanFunc n →ₗ[ℝ] BooleanFunc n where
   map_smul' := by
     simp [fourier_transform', smul_sum, ← smul_assoc, smul_eq_mul]
 
-
-
-
 theorem plancherel (f g : BooleanFunc n) :
   ⟪f, g⟫ = ∑ S, fourier_coeff S f * fourier_coeff S g := by
   conv_lhs =>
     rw [fourier_expansion f, fourier_expansion g]
   simp_rw [inner_sum, sum_inner]
   conv_lhs =>
-    enter [2]; ext S; enter [2]; ext i
+    enter [2,S,2,i]
     erw [inner_smul_left, inner_smul_right]
   simp only [starRingEnd_apply, star_trivial]
   simp_rw [orthonormal_iff_ite.mp chi_orthonormal]
@@ -375,11 +366,9 @@ def hamming_dist (f g : Cube n → ZMod 2) :=
 
 -- fact 1.12
 lemma expectation_f_eq_fourier_coeff_emptyset (f : BooleanFunc n) : 𝐄 f = fourier_coeff ∅ f := by
-  rw [← mul_one f];
-  rw [← inner_eq_expect]
-  rw [fourier_coeff]
+  rw [← mul_one f,← inner_eq_expect,fourier_coeff]
   unfold χₛ
-  simp -- make chi empty lemma
+  simp
   rfl
 
 lemma inner_eq_expect_left (f : BooleanFunc n) :
@@ -441,13 +430,7 @@ lemma variance_eq_expect_sq_sub_sq_expect (f : BooleanFunc n) :
     simp [mul_assoc]
     ring
   rw [h, map_smul 𝐄]
-  conv_lhs =>
-    enter [2]
-    rw [sq]
-  simp_rw [Pi.mul_def]
-  rw [expectation_const]
-  rw [← sq]
-  rw [smul_eq_mul]
+  simp_rw [sq, Pi.mul_def, expectation_const, ← sq, smul_eq_mul]
   ring
 
 lemma variance_eq_nonempty_fourier_sum (f : BooleanFunc n) :
@@ -457,7 +440,7 @@ lemma variance_eq_nonempty_fourier_sum (f : BooleanFunc n) :
   rw [parseval', expectation_f_eq_fourier_coeff_emptyset]
 
 noncomputable def weight (f : BooleanFunc n) (k : ℕ) : ℝ :=
-  ∑ S : Finset (Fin n), if S.card = k then (fourier_coeff S f) ^ 2 else 0
+  ∑ S : Finset (Fin n), if #S = k then (fourier_coeff S f) ^ 2 else 0
 
 notation "𝐖" k "[" f "]" => weight f k
 
@@ -573,6 +556,7 @@ lemma expectation_mul_separate {n : ℕ} (f g : BooleanFunc n) :
     enter [2, y]
     rw [map_smul 𝐄 (f y) g]
   simp
+
   sorry
 
 lemma fourier_coeff_conv {S} : fourier_coeff S (f ∗ g) = fourier_coeff S f * fourier_coeff S g := by
@@ -736,10 +720,7 @@ theorem Li_idempotent (i : Fin n) (f : BooleanFunc n) :
     ring
     unfold update_bit
     conv_lhs =>
-      enter [2]
-      enter [1]
-      enter [1]
-      ext j
+      enter [2,1,1,j]
       simp
     sorry
   | 1 => sorry
@@ -896,24 +877,26 @@ lemma inner_prod_laplacian_eq_total_inf :
   simp_rw [h_lift, inner_sum, inner_prod_li_eq_infi]
 
 lemma total_inf_eq_fourier_weight_sum :
-  𝐈[f] = ∑ k : (Fin n), k * weight f k := by
+  𝐈[f] = ∑ k : (Finset.range (n+1)), k * weight f k := by
   rw [total_inf_eq_fourier_sum]
   unfold weight
   conv_rhs =>
     arg 2
     intro k
     rw [mul_sum]
-  simp
+  --simp
   rw [sum_comm]
   congr 1
   ext S
+  simp only [mul_ite, mul_zero]
   simp_rw [← ite_zero_mul]
-  rw [← sum_mul]
-  nth_rw 1 [show (#S) = ∑ x : (Fin n), if #S = x then (#S : ℝ) else 0 by
-    norm_cast
-    -- simp_rw [Finset.sum_ite_eq _ (#S) (fun _  => #S)]
-    sorry
-    ]
+  simp_rw [← sum_mul]
+  conv_rhs =>
+    enter [1]
+    --rw [← sum_ite_card (fun x=> #S = x)]
+  simp only [univ_eq_attach, mul_eq_mul_right_iff, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
+    pow_eq_zero_iff]
+
   sorry -- Why can we not use sum_ite_eq or similar here?
 
 
